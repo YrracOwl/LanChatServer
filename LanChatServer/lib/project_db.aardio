@@ -1,0 +1,16 @@
+﻿
+namespace project_db{
+	import sqlite;
+	db = sqlite("/res/works.db");//打开数据库连接,参数指定硬盘文件路径
+	init = function(){
+		if( not db.existsTable("projects") ){ 
+			db.exec( "CREATE TABLE [projects](name, member, time);"); //创建表
+		}
+		//db.exec("DROP TABLE [users]" ); 
+		if( not db.existsTable("users") ){ 
+			db.exec( "CREATE TABLE [users](username, password, token);"); //创建表
+		}	
+	}
+	cmd_proj = db.prepare("INSERT INTO [projects] VALUES ( @name,@member,@time );")
+	cmd_user = db.prepare("INSERT INTO [users] VALUES ( @username,@password,@token );")
+}
