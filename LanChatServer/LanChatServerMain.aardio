@@ -10,15 +10,10 @@ txtMessage={cls="edit";left=29;top=22;right=741;bottom=389;db=1;dl=1;dr=1;dt=1;e
 )
 /*}}*/
 
-//import web.json;
-
 import project_db;
 project_db.init();
-project_db.cmd_user.step(
-	username = "userTest";
-	password = "passwordTest";
-	token = "TestTestTestTestTestTest";
-);
+project_db.on_test();
+
 
 import console;
 var user_token = {};
@@ -107,37 +102,46 @@ else {
 
 //同一个端口还可以同时运行HTTP服务端
 wsrv.httpServer.run( 
-    function(response,request){ 
-         //response.loadcode( request.path  );
-    	if( request.path == "/login" ){
+    function(response,request){
+		if (request.path == "/login"){
 			winform.txtMessage.print("HTTP协议访问：",request.url);
 			winform.txtMessage.print("登录用户名称：",request.post.username);
 			winform.txtMessage.print("登录用户密码：",request.post.password);
-			//查 - 返回首行数据
-			var result = project_db.db.stepQuery("SELECT * FROM [users]",{ username = request.post.username, password = request.post.password})
-			winform.txtMessage.print("数据库查询结果为：",result);
+			var result = project_db.sel_testuser(request.post.username, request.post.password)
+			
 			response.contentType = "text/json"
 			response.jsonPrettyPrint = true;
-			response.write({"token": result.token});
+			if(result){
+				response.write({"token": result.token});	
+				winform.txtMessage.print("数据库查询结果为：",result);
+			}
+			else {
+				response.write({"status": "username does not exist!", "statuscode": 502});
+				winform.txtMessage.print("用户" + request.post.username + "不存在或者登录密码错误，请重试！");
+			}
+			
 		}
 		elseif(request.path == "/register"){
-			var result = project_db.db.stepQuery("SELECT * FROM [users]",{ username = request.post.username})
+			var result = project_db.sel_testuser(request.post.username)
 			if (result){
 				response.contentType = "text/json";
 				response.jsonPrettyPrint = true;
-				response.write({"status": "username existed!", "statuscode": 502});			
+				response.write({"status": "username existed!", "statuscode": 502});	
+				winform.txtMessage.print("用户" + request.post.username + "已存在！");
 			}
 			else {
-				project_db.cmd_user.step(
+				project_db.replace_testuser.step(
 					username = request.post.username;
 					password = request.post.password;
-					token = "NeedFuncToGenerate1";
+					token = "NeedFuncToGenerate";
 				);
 				response.contentType = "text/json";
 				response.jsonPrettyPrint = true;
 				response.write({"status": "register successed!", "statuscode": 200});
+				winform.txtMessage.print("用户" + request.post.username + "成功注册！");
 			};
-		};
+		}
+		
 	}
 );
 
@@ -155,9 +159,12 @@ winform.btnSurvey.oncommand = function(id,event){
 }
 
 rpcServer.xcallback.clientTime = function(hSocket,result,err){
-    winform.txtMessage.print( wsrv.getRemoteIp(hSocket) +"返回调查结果:"
-    	, result );
+    winform.txtMessage.print( wsrv.getRemoteIp(hSocket) +"返回调查结果:", result );
 }
 
+
 winform.show() 
+winform.onClose = function(hwnd,message,wParam,lParam){
+    project_db.off_test();
+}
 win.loopMessage();
