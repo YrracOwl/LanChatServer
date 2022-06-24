@@ -48,7 +48,7 @@ wsrv.onUpgradeToWebsocket = function(hSocket,request,response,protocol,origin){
         //允许指定的套接字开启JSON-RPC服务
         return rpcServer.start(hSocket);
     }
-    elseif(string.match(request.path, "</aardio>") != "/aardio"){
+    elseif(string.match(request.path, "</lanchat>") != "/lanchat"){
 		//禁止访问其他地址
 		response.close();
     }
@@ -60,7 +60,7 @@ wsrv.onOpen = function(hSocket){
     if(client)  winform.txtMessage.print("客户端已连接", client.getRemoteIp() ); 
    	rpcServer.notify(hSocket,"hello","服务端通知");
    	
-	var token_table = string.split(request.path, "</aardio/>");
+	var token_table = string.split(request.path, "</lanchat/>");
 	var token_jwt = token_table[2];
 	winform.txtMessage.print("客户端令牌", token_jwt);
 	
@@ -85,7 +85,7 @@ wsrv.onMessage = function(hSocket,msg){
     winform.txtMessage.print(hSocket,msg.data); 
     wsrv.send(hSocket,"WebSocket客户端，收到了你发过来的消息：" + msg.data) 
 /*
-	var token_table = string.split(request.path, "</aardio/>");
+	var token_table = string.split(request.path, "</lanchat/>");
 	var token_jwt = token_table[2];
     wsrv.send(hSocket,"WebSocket客户端，你的Token是：" + token_jwt) 
 */
