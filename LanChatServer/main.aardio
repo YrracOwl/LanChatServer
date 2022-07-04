@@ -1,0 +1,211 @@
+import win.ui;
+/*DSG{{*/
+var winform = win.form(text="HTTP/WebSocket/JSON-RPC 三合一体服务端";left=10;top=4;right=774;bottom=467)
+winform.add(
+btnPublish={cls="button";text="群发通知消息";left=505;top=411;right=621;bottom=450;db=1;dr=1;z=2};
+btnSurvey={cls="button";text="发起调查任务";left=633;top=408;right=746;bottom=449;db=1;dr=1;z=3};
+changeExpireIn={cls="button";text="更改超时";left=304;top=416;right=376;bottom=440;z=7};
+changeKey={cls="button";text="更改密钥";left=160;top=416;right=240;bottom=440;z=5};
+expireIn={cls="edit";text="60";left=264;top=416;right=304;bottom=440;edge=1;z=6};
+privateKey={cls="edit";text="lanchatisgood";left=32;top=416;right=160;bottom=440;edge=1;z=4};
+txtMessage={cls="edit";left=29;top=22;right=741;bottom=389;db=1;dl=1;dr=1;dt=1;edge=1;multiline=1;vscroll=1;z=1}
+)
+/*}}*/
+
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+import unqlite;
+// 打开数据库( 如果不存在就创建 )
+var udbUser = unqlite("/testUser.db");
+if( !udbUser.fetch("userTest")){
+	udbUser.store("userTest","pwdTest");
+}
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+import crypt.jwt;
+var jwtToken = crypt.jwt("lanchatisgood",60);
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+import console;
+var user_token = {};
+//创建WebSocket服务端
+import web.socket.server;
+var wsrv = web.socket.server();
+//创建JSON-RPC服务端
+import web.socket.jsonServer;
+var rpcServer = web.socket.jsonServer(wsrv);
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+//指定客户端可以调用的对象和方法
+rpcServer.external ={
+    
+    /*
+    如果函数名首字符为$，第一个回调参数为$( 表示当前客户端套接字句柄 )。
+    */
+    $hello = function($,name){
+		return "hello " + name;
+	}
+
+	aardio= {
+    
+    	hello = function(name){
+			return "aardio.hello " + name;
+		}
+	}
+} 
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+//客户端使用HTTP请求切换到WebSocket协议
+wsrv.onUpgradeToWebsocket = function(hSocket,request,response,protocol,origin){    
+    if( request.path == "/jsonrpc" ){
+        //允许指定的套接字开启JSON-RPC服务
+        return rpcServer.start(hSocket);
+    }
+    elseif(string.match(request.path, "</lanchat>") != "/lanchat"){
+		//禁止访问其他地址
+		response.close();
+    }
+}
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+//一个客户端连接过来了
+wsrv.onOpen = function(hSocket){ 
+    var client = wsrv.client(hSocket);
+    if(client)  winform.txtMessage.print("客户端已连接", client.getRemoteIp() ); 
+   	rpcServer.notify(hSocket,"hello","服务端通知");
+   	
+	var token_table = string.split(request.path, "</lanchat/>");
+	var token_jwt = token_table[2];
+	client_data = jwtToken.verify("Bearer "+token_jwt);
+	
+	//winform.txtMessage.print("客户端令牌", token_jwt);
+	
+	var tmp_pointer = hSocket;
+	if(client_data){	
+		user_token[[tostring(tmp_pointer)]] = client_data.payload;
+		winform.txtMessage.print("服务端user_token表", user_token);
+	}
+	else {
+		user_token[[tostring(tmp_pointer)]] = null;
+		winform.txtMessage.print("客户端token失效，请重新登录",hSocket);
+		client.close();
+	}
+	winform.txtMessage.print("--------------------");
+	
+}
+
+//一个客户端掉线了
+wsrv.onClose = function(hSocket){
+	winform.txtMessage.print("客户端已断线",hSocket);
+}
+
+//一个客户端出错了
+wsrv.onError = function(hSocket,err){
+	winform.txtMessage.print("出错了",hSocket,err);
+}
+
+//一个客户端发消息过来了
+wsrv.onMessage = function(hSocket,msg){
+    winform.txtMessage.print(hSocket,msg.data); 
+    wsrv.send(hSocket,"WebSocket客户端，收到了你发过来的消息：" + msg.data) 
+/*
+	var token_table = string.split(request.path, "</lanchat/>");
+	var token_jwt = token_table[2];
+    wsrv.send(hSocket,"WebSocket客户端，你的Token是：" + token_jwt) 
+*/
+}
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+//启动服务端 
+if( wsrv.start(,8876) ){
+	winform.txtMessage.print( wsrv.getUrl("jsonrpc"),"已启动 WebSocket/JSON-RPC 服务器");
+	winform.txtMessage.print( wsrv.httpServer.getUrl(),"已启动 HTTP服务器");
+}
+else {
+	winform.txtMessage.print("启动失败，建议修改端口号")	
+}
+
+//同一个端口还可以同时运行HTTP服务端
+wsrv.httpServer.run( 
+    function(response,request){
+		if (request.path == "/login"){
+			winform.txtMessage.print("HTTP协议访问：",request.url);
+			winform.txtMessage.print("登录用户名称：",request.post.username);
+			winform.txtMessage.print("登录用户密码：",request.post.password);
+			
+		
+			var result = udbUser.fetch(request.post.username)
+			
+			response.contentType = "text/json"
+			response.jsonPrettyPrint = true;
+			if(result === request.post.password){
+				winform.txtMessage.print("数据库比对一致！");
+				winform.txtMessage.print("密码AES值" + request.post.password);
+				//winform.txtMessage.print("crypt.jwt对象生成！");
+				var token_data = {"username"=request.post.username;};
+				token = jwtToken.encode(token_data);
+				response.write({"status": "succeed", "token": token});
+				winform.txtMessage.print("数据库查询成功，生成jwt中...");
+				winform.txtMessage.print(token)
+			}
+			else {
+				response.write({"status": "failed", "statuscode": 502});
+				winform.txtMessage.print("用户" + request.post.username + "不存在或者登录密码错误，请重试！");
+			}
+			winform.txtMessage.print("--------------------");
+			
+		}
+		elseif(request.path == "/register"){
+			//var result = project_db.sel_testuser(request.post.username)
+			var result = udbUser.fetch(request.post.username)
+			if (result){
+				response.contentType = "text/json";
+				response.jsonPrettyPrint = true;
+				response.write({"status": "failed", "statuscode": 502, "info": "注册失败！用户名已存在！"});	
+				winform.txtMessage.print("用户" + request.post.username + "已存在！");
+			}
+			else {
+				udbUser.store(request.post.username,request.post.password);
+				response.contentType = "text/json";
+				response.jsonPrettyPrint = true;
+				response.write({"status": "succeed", "statuscode": 200, "info": "注册成功！"});
+				winform.txtMessage.print("用户" + request.post.username + "成功注册！");
+				winform.txtMessage.print("密码AES值" + request.post.password);
+			};
+			winform.txtMessage.print("--------------------");
+		}
+		
+	}
+);
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+winform.btnPublish.oncommand = function(id,event){
+    
+    //发布订阅模式：在指定频道发布消息，支持传给客户端不定个数的参数
+	rpcServer.publish("serverTime",time() )
+}
+
+winform.btnSurvey.oncommand = function(id,event){
+    
+    //调查模式：对客户端发起问询，支持传给客户端不定个数的参数
+	rpcServer.survey("clientTime");
+	
+}
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+rpcServer.xcallback.clientTime = function(hSocket,result,err){
+    winform.txtMessage.print( wsrv.getRemoteIp(hSocket) +"返回调查结果:", result );
+}
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+winform.changeKey.oncommand = function(id,event){
+	jwtToken = crypt.jwt(winform.privateKey.text,tonumber(winform.expireIn));
+}
+
+winform.changeExpireIn.oncommand = function(id,event){
+	jwtToken = crypt.jwt(winform.privateKey.text,tonumber(winform.expireIn));
+}
+//------------------------------------------------------------------------
+//------------------------------------------------------------------------
+winform.show();
+win.loopMessage();
